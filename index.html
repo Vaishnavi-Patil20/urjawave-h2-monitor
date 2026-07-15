@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UrjaWave — Hydrogen Generation Monitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1220; --surface: #111827; --surface-2: #1e293b; --surface-3: #334155;
+      --border: #1e3a5f; --primary: #06b6d4; --primary-glow: rgba(6,182,212,0.15);
+      --accent: #10b981; --accent-glow: rgba(16,185,129,0.15); --warning: #f59e0b;
+      --danger: #ef4444; --danger-glow: rgba(239,68,68,0.15);
+      --text: #f1f5f9; --text-secondary: #94a3b8; --text-dim: #64748b;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --radius: 10px; --shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; overflow-x: hidden; }
+    @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 0 0 var(--primary-glow); } 50% { box-shadow: 0 0 20px 4px var(--primary-glow); } }
+    @keyframes pulse-danger { 0%,100% { box-shadow: 0 0 0 0 var(--danger-glow); } 50% { box-shadow: 0 0 20px 4px var(--danger-glow); } }
+    @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .dashboard { min-height: 100vh; display: flex; flex-direction: column; }
+    .header { background: linear-gradient(180deg, var(--surface) 0%, rgba(17,24,39,0.95) 100%); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+    .header-brand { display: flex; align-items: center; gap: 12px; }
+    .header-brand .logo { width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), #0891b2); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; box-shadow: 0 0 20px var(--primary-glow); }
+    .header-brand h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .header-brand span { font-size: 0.75rem; color: var(--text-secondary); font-weight: 500; }
+    .header-status { display: flex; align-items: center; gap: 16px; }
+    .status-pill { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .status-dot.live { background: var(--accent); animation: pulse-glow 2s infinite; }
+    .status-dot.warn { background: var(--warning); }
+    .status-dot.danger { background: var(--danger); animation: pulse-danger 1.5s infinite; }
+    .status-dot.blink { animation: blink 1s infinite; }
+    .header-actions { display: flex; gap: 8px; }
+    .btn { padding: 8px 16px; border-radius: var(--radius); border: none; font-weight: 600; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s; font-family: var(--font); }
+    .btn-primary { background: var(--primary); color: #000; }
+    .btn-primary:hover { background: #22d3ee; transform: translateY(-1px); box-shadow: 0 4px 12px var(--primary-glow); }
+    .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-danger { background: rgba(239,68,68,0.15); color: var(--danger); border: 1.5px solid rgba(239,68,68,0.3); }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+    .btn-success { background: rgba(16,185,129,0.15); color: var(--accent); border: 1.5px solid rgba(16,185,129,0.3); }
+    .btn-success:hover { background: rgba(16,185,129,0.25); }
+    .btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+    .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; padding: 16px 24px; flex: 1; }
+    @media (max-width: 1200px) { .main-grid { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); transition: all 0.3s; }
+    .card:hover { border-color: #1e4a6b; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+    .card-badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+    .badge-live { background: rgba(16,185,129,0.15); color: var(--accent); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-warn { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+    .badge-danger { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+    .badge-info { background: var(--primary-glow); color: var(--primary); border: 1px solid rgba(6,182,212,0.3); }
+    .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 16px; }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    .kpi-card { padding: 14px; position: relative; overflow: hidden; }
+    .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--primary), transparent); }
+    .kpi-card.alert::before { background: linear-gradient(90deg, var(--danger), transparent); }
+    .kpi-card.warn::before { background: linear-gradient(90deg, var(--warning), transparent); }
+    .kpi-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .kpi-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+    .kpi-unit { font-size: 0.75rem; color: var(--text-dim); font-weight: 500; margin-left: 2px; }
+    .kpi-trend { font-size: 0.75rem; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+    .trend-up { color: var(--accent); } .trend-down { color: var(--danger); } .trend-warn { color: var(--warning); }
+    .kpi-mini-chart { height: 30px; margin-top: 8px; display: flex; align-items: end; gap: 2px; }
+    .kpi-mini-bar { flex: 1; background: var(--surface-3); border-radius: 2px 2px 0 0; transition: all 0.3s; }
+    .kpi-mini-bar.active { background: var(--primary); opacity: 0.8; }
+    .kpi-mini-bar.alert { background: var(--danger); opacity: 0.8; }
+    .chart-container { position: relative; height: 220px; width: 100%; }
+    .chart-svg { width: 100%; height: 100%; }
+    .chart-grid-line { stroke: var(--surface-3); stroke-width: 0.5; stroke-dasharray: 4,4; }
+    .chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .chart-area { opacity: 0.1; }
+    .chart-point { r: 3; transition: all 0.3s; cursor: pointer; }
+    .chart-point:hover { r: 6; }
+    .chart-tooltip { position: absolute; background: var(--surface-2); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 0.75rem; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .chart-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 0.75rem; }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .alerts-panel { max-height: 320px; overflow-y: auto; }
+    .alert-item { padding: 12px; border-radius: var(--radius); margin-bottom: 8px; border-left: 3px solid transparent; animation: slideIn 0.3s ease-out; display: flex; gap: 10px; align-items: start; cursor: pointer; transition: all 0.2s; background: var(--surface-2); }
+    .alert-item:hover { background: var(--surface-3); }
+    .alert-item.critical { border-left-color: var(--danger); background: var(--danger-glow); }
+    .alert-item.warning { border-left-color: var(--warning); background: rgba(245,158,11,0.08); }
+    .alert-item.info { border-left-color: var(--primary); background: var(--primary-glow); }
+    .alert-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; flex-shrink: 0; }
+    .alert-icon.critical { background: var(--danger-glow); color: var(--danger); }
+    .alert-icon.warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .alert-icon.info { background: var(--primary-glow); color: var(--primary); }
+    .alert-content { flex: 1; }
+    .alert-title { font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; }
+    .alert-desc { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4; }
+    .alert-time { font-size: 0.65rem; color: var(--text-dim); margin-top: 4px; }
+    .alert-dismiss { font-size: 0.7rem; color: var(--text-dim); cursor: pointer; padding: 2px 6px; border-radius: 4px; }
+    .alert-dismiss:hover { color: var(--text); background: var(--surface-3); }
+    .sys-status { display: flex; flex-direction: column; gap: 10px; }
+    .sys-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--surface-2); }
+    .sys-item:last-child { border-bottom: none; }
+    .sys-name { font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
+    .sys-value { font-size: 0.8rem; font-weight: 600; }
+    .sys-bar { height: 4px; background: var(--surface-2); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .sys-bar-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .data-table th { text-align: left; padding: 10px 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    .data-table td { padding: 10px 12px; border-bottom: 1px solid var(--surface-2); }
+    .data-table tr:hover td { background: var(--surface-2); }
+    .run-status { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+    .run-status.completed { background: rgba(16,185,129,0.15); color: var(--accent); }
+    .run-status.running { background: var(--primary-glow); color: var(--primary); }
+    .run-status.failed { background: var(--danger-glow); color: var(--danger); }
+    .sim-visual { background: var(--surface-2); border-radius: var(--radius); padding: 16px; position: relative; overflow: hidden; min-height: 180px; }
+    .sim-field-line { position: absolute; height: 1px; background: linear-gradient(90deg, transparent, var(--primary), transparent); opacity: 0.4; }
+    .sim-particle { position: absolute; width: 4px; height: 4px; background: var(--accent); border-radius: 50%; opacity: 0.6; }
+    .sim-legend { display: flex; gap: 12px; margin-top: 8px; font-size: 0.7rem; }
+    .sim-legend-item { display: flex; align-items: center; gap: 4px; }
+    .sim-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .mqtt-topic { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; margin-bottom: 6px; font-size: 0.75rem; transition: all 0.2s; }
+    .mqtt-topic:hover { background: var(--surface-3); }
+    .mqtt-topic-name { font-family: 'SF Mono', monospace; color: var(--primary); font-size: 0.7rem; }
+    .mqtt-topic-rate { font-weight: 600; color: var(--accent); font-size: 0.7rem; }
+    .mqtt-metric { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.8rem; border-bottom: 1px solid var(--surface-2); }
+    .mqtt-metric:last-child { border-bottom: none; }
+    .mqtt-throughput-bar { height: 24px; display: flex; align-items: end; gap: 2px; margin-top: 8px; padding: 4px; background: var(--surface-2); border-radius: 4px; }
+    .mqtt-tick { flex: 1; background: var(--surface-3); border-radius: 1px; transition: all 0.3s; }
+    .mqtt-tick.active { background: var(--primary); }
+    .mqtt-tick.recent { background: var(--accent); }
+    .ml-component { padding: 10px; background: var(--surface-2); border-radius: 8px; margin-bottom: 10px; transition: all 0.2s; cursor: pointer; }
+    .ml-component:hover { background: var(--surface-3); }
+    .ml-component-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .ml-component-name { font-size: 0.8rem; font-weight: 600; }
+    .ml-component-score { font-size: 0.9rem; font-weight: 800; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; }
+    .ml-score-good { background: rgba(16,185,129,0.15); color: var(--accent); }
+    .ml-score-warn { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .ml-score-danger { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .ml-rul { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; }
+    .ml-rul-value { font-weight: 600; color: var(--text); }
+    .ml-risk { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; margin-top: 6px; }
+    .ml-risk-low { background: rgba(16,185,129,0.1); color: var(--accent); }
+    .ml-risk-med { background: rgba(245,158,11,0.1); color: var(--warning); }
+    .ml-risk-high { background: rgba(239,68,68,0.1); color: var(--danger); }
+    .ml-degradation-chart { height: 20px; display: flex; align-items: end; gap: 1px; margin-top: 6px; }
+    .ml-deg-bar { flex: 1; background: var(--surface-3); border-radius: 1px 1px 0 0; }
+    .ml-action { font-size: 0.7rem; color: var(--text-dim); margin-top: 6px; font-style: italic; }
+    .ml-model-status { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--surface-2); border-radius: 8px; margin-bottom: 12px; font-size: 0.75rem; }
+    .ml-model-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse-glow 2s infinite; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+    @media (max-width: 768px) { .header { flex-wrap: wrap; gap: 8px; } .main-grid { padding: 12px; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+<div class="dashboard" id="dashboard">
+  <header class="header">
+    <div class="header-brand">
+      <div class="logo">⚡</div>
+      <div>
+        <h1>UrjaWave — Hydrogen Generation Monitor</h1>
+        <span>NAIN 2.0 | Government of Karnataka | ESP32 Sensor Array v2.1</span>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-pill"><span class="status-dot live"></span><span>ESP32 Online</span></div>
+      <div class="status-pill" id="mqtt-pill"><span id="mqtt-dot" class="status-dot live"></span><span id="mqtt-text">MQTT Connected</span></div>
+      <div class="status-pill"><span id="db-status-dot" class="status-dot live"></span><span id="db-status-text">DB Logging</span></div>
+      <div class="status-pill" id="ml-pill"><span id="ml-dot" class="status-dot live"></span><span id="ml-text">ML Active</span></div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline btn-sm" onclick="exportData()">📤 Export CSV</button>
+      <button class="btn btn-success btn-sm" id="run-btn" onclick="toggleRun()">▶ Start Run</button>
+    </div>
+  </header>
+
+  <div style="padding: 0 24px;">
+    <div class="kpi-grid" id="kpi-grid"></div>
+  </div>
+
+  <div class="main-grid">
+    <div class="left-col" style="display:flex;flex-direction:column;gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Real-Time Chamber Telemetry</div>
+          <div class="card-badge badge-live">● LIVE</div>
+        </div>
+        <div class="chart-container" id="main-chart-container">
+          <svg class="chart-svg" id="main-chart" viewBox="0 0 800 220" preserveAspectRatio="none">
+            <g id="main-grid"></g>
+            <path id="volt-area" class="chart-area" fill="#06b6d4" />
+            <path id="curr-area" class="chart-area" fill="#f59e0b" />
+            <path id="volt-line" class="chart-line" stroke="#06b6d4" />
+            <path id="curr-line" class="chart-line" stroke="#f59e0b" />
+            <path id="temp-line" class="chart-line" stroke="#ef4444" />
+            <g id="main-points"></g>
+          </svg>
+          <div class="chart-tooltip" id="main-tooltip"></div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#06b6d4;"></span>Voltage (V)</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span>Current (A)</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span>Temperature (°C)</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">H₂ Efficiency vs Theoretical Target</div>
+            <div class="card-badge badge-live">● LIVE</div>
+          </div>
+          <div class="chart-container" style="height:180px;">
+            <svg class="chart-svg" id="eff-chart" viewBox="0 0 400 180" preserveAspectRatio="none">
+              <g id="eff-grid"></g>
+              <path id="eff-area" class="chart-area" fill="#10b981" />
+              <path id="eff-line" class="chart-line" stroke="#10b981" />
+              <line id="target-line" stroke="#64748b" stroke-width="1" stroke-dasharray="6,4" />
+              <text id="target-label" fill="#64748b" font-size="10" text-anchor="end">Target: 1,200 L/hr</text>
+            </svg>
+          </div>
+          <div style="display:flex;gap:24px;align-items:center;justify-content:center;padding:12px;">
+            <div style="text-align:center;">
+              <div style="font-size:1.75rem;font-weight:800;color:var(--accent);" id="eff-current">0</div>
+              <div style="font-size:0.7rem;color:var(--text-secondary);">Current L/hr</div>
+            </div>
+            <div style="width:1px;height:40px;background:var(--surface-3);"></div>
+            <div style="text-align:center;">
+              <div style="font-size:1.75rem;font-weight:800;color:var(--primary);" id="eff-percent">0%</div>
+              <div style="font-size:0.7rem;color:var(--text-secondary);">of Target</div>
+            </div>
+            <div style="width:1px;height:40px;background:var(--surface-3);"></div>
+            <div style="text-align:center;">
+              <div style="font-size:1.75rem;font-weight:800;color:var(--text);" id="eff-cumulative">0</div>
+              <div style="font-size:0.7rem;color:var(--text-secondary);">Total L (Run)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Chamber Field Simulation</div>
+            <div class="card-badge badge-live">● VALIDATED</div>
+          </div>
+          <div class="sim-visual" id="sim-visual">
+            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:120px;height:200px;border:2px solid var(--primary);border-radius:60px;opacity:0.6;"></div>
+            <div style="position:absolute;left:50%;top:20%;transform:translateX(-50%);width:80px;height:2px;background:var(--primary);opacity:0.4;"></div>
+            <div style="position:absolute;left:50%;top:80%;transform:translateX(-50%);width:80px;height:2px;background:var(--primary);opacity:0.4;"></div>
+            <div class="sim-field-line" style="top:30%;left:20%;width:60%;transform:rotate(-15deg);"></div>
+            <div class="sim-field-line" style="top:40%;left:20%;width:60%;transform:rotate(-5deg);"></div>
+            <div class="sim-field-line" style="top:50%;left:20%;width:60%;"></div>
+            <div class="sim-field-line" style="top:60%;left:20%;width:60%;transform:rotate(5deg);"></div>
+            <div class="sim-field-line" style="top:70%;left:20%;width:60%;transform:rotate(15deg);"></div>
+            <div class="sim-particle" style="left:35%;top:35%;animation:fadeIn 2s infinite;"></div>
+            <div class="sim-particle" style="left:45%;top:45%;animation:fadeIn 3s infinite 0.5s;"></div>
+            <div class="sim-particle" style="left:55%;top:55%;animation:fadeIn 2.5s infinite 1s;"></div>
+            <div class="sim-particle" style="left:40%;top:60%;animation:fadeIn 2s infinite 1.5s;"></div>
+            <div class="sim-particle" style="left:60%;top:40%;animation:fadeIn 3s infinite 0.3s;"></div>
+            <div style="position:absolute;bottom:8px;left:8px;font-size:0.65rem;color:var(--text-dim);">Cathode (-)</div>
+            <div style="position:absolute;top:8px;left:8px;font-size:0.65rem;color:var(--text-dim);">Anode (+)</div>
+            <div style="position:absolute;bottom:8px;right:8px;font-size:0.65rem;color:var(--text-dim);">H₂ Outlet</div>
+          </div>
+          <div class="sim-legend">
+            <div class="sim-legend-item"><span class="sim-dot" style="background:var(--primary);"></span>Electric Field</div>
+            <div class="sim-legend-item"><span class="sim-dot" style="background:var(--accent);"></span>H₂ Ions</div>
+            <div class="sim-legend-item"><span class="sim-dot" style="background:var(--surface-3);"></span>Chamber Wall</div>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--surface-2);">
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;">
+              <span style="color:var(--text-secondary);">Geometry Validation</span>
+              <span style="color:var(--accent);font-weight:600;">✓ Matched (±2.3%)</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-top:4px;">
+              <span style="color:var(--text-secondary);">Field Distribution</span>
+              <span style="color:var(--accent);font-weight:600;">✓ Uniform</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Test Run History & Data Log</div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" onclick="filterRuns('all')">All</button>
+            <button class="btn btn-outline btn-sm" onclick="filterRuns('completed')">Completed</button>
+            <button class="btn btn-outline btn-sm" onclick="filterRuns('running')">Running</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="run-table">
+            <thead>
+              <tr>
+                <th>Run ID</th><th>Timestamp</th><th>Duration</th><th>Avg Voltage</th><th>Avg Current</th><th>Max Temp</th><th>H₂ Output</th><th>Efficiency</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="run-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-col" style="display:flex;flex-direction:column;gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">MQTT Broker Status</div>
+          <div class="card-badge badge-live" id="mqtt-badge">● CONNECTED</div>
+        </div>
+        <div class="sys-status">
+          <div class="mqtt-metric">
+            <span style="color:var(--text-secondary);">Broker</span>
+            <span style="font-weight:600;font-family:monospace;font-size:0.75rem;">192.168.1.105:1883</span>
+          </div>
+          <div class="mqtt-metric">
+            <span style="color:var(--text-secondary);">Protocol</span>
+            <span style="font-weight:600;">MQTT v3.1.1</span>
+          </div>
+          <div class="mqtt-metric">
+            <span style="color:var(--text-secondary);">Client ID</span>
+            <span style="font-weight:600;font-family:monospace;font-size:0.75rem;">esp32-chamber-A7</span>
+          </div>
+          <div class="mqtt-metric">
+            <span style="color:var(--text-secondary);">Connection Uptime</span>
+            <span style="font-weight:600;" id="mqtt-uptime">14h 32m 18s</span>
+          </div>
+          <div class="mqtt-metric">
+            <span style="color:var(--text-secondary);">Last Ping</span>
+            <span style="font-weight:600;color:var(--accent);" id="mqtt-ping">24ms</span>
+          </div>
+          <div class="mqtt-metric">
+            <span style="color:var(--text-secondary);">Messages / sec</span>
+            <span style="font-weight:600;color:var(--primary);" id="mqtt-rate">12.4</span>
+          </div>
+          <div class="mqtt-metric">
+            <span style="color:var(--text-secondary);">Total Messages</span>
+            <span style="font-weight:600;" id="mqtt-total">842,391</span>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Subscribed Topics</div>
+          <div id="mqtt-topics">
+            <div class="mqtt-topic"><span class="mqtt-topic-name">urjawave/chamber/voltage</span><span class="mqtt-topic-rate">4.2/s</span></div>
+            <div class="mqtt-topic"><span class="mqtt-topic-name">urjawave/chamber/current</span><span class="mqtt-topic-rate">4.2/s</span></div>
+            <div class="mqtt-topic"><span class="mqtt-topic-name">urjawave/chamber/temp</span><span class="mqtt-topic-rate">2.1/s</span></div>
+            <div class="mqtt-topic"><span class="mqtt-topic-name">urjawave/chamber/flow</span><span class="mqtt-topic-rate">1.0/s</span></div>
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Message Throughput (last 60s)</div>
+          <div class="mqtt-throughput-bar" id="mqtt-throughput"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Predictive Maintenance (ML)</div>
+          <div class="card-badge badge-info" id="ml-badge">● INFERENCE</div>
+        </div>
+        <div class="ml-model-status">
+          <span class="ml-model-dot"></span>
+          <span>Model: <b>RandomForest v2.4</b> — Last trained: 2026-07-12</span>
+          <span style="margin-left:auto;color:var(--accent);font-weight:600;">F1: 0.94</span>
+        </div>
+        <div id="ml-components"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--surface-2);">
+          <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:4px;">Top Feature Importance</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:2px;"><span>Cathode Voltage Drop</span><span>32%</span></div>
+              <div class="sys-bar"><div class="sys-bar-fill" style="width:32%;background:var(--primary);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:2px;"><span>Temperature Gradient</span><span>24%</span></div>
+              <div class="sys-bar"><div class="sys-bar-fill" style="width:24%;background:var(--accent);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:2px;"><span>Current Stability</span><span>18%</span></div>
+              <div class="sys-bar"><div class="sys-bar-fill" style="width:18%;background:var(--warning);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:2px;"><span>Electrolyte Conductivity</span><span>15%</span></div>
+              <div class="sys-bar"><div class="sys-bar-fill" style="width:15%;background:var(--danger);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-bottom:2px;"><span>Gas Purity (ppm)</span><span>11%</span></div>
+              <div class="sys-bar"><div class="sys-bar-fill" style="width:11%;background:#8b5cf6;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Anomaly Alerts</div>
+          <div class="card-badge badge-warn" id="alert-count">0 Active</div>
+        </div>
+        <div class="alerts-panel" id="alerts-panel"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">System Health</div>
+          <div class="card-badge badge-live">● OK</div>
+        </div>
+        <div class="sys-status">
+          <div class="sys-item"><div class="sys-name">🔌 ESP32 Uptime</div><div class="sys-value" id="uptime">14h 32m</div></div>
+          <div class="sys-bar"><div class="sys-bar-fill" style="width:92%;background:var(--accent);"></div></div>
+          <div class="sys-item"><div class="sys-name">💾 SD Card Storage</div><div class="sys-value" id="storage">4.2 GB / 16 GB</div></div>
+          <div class="sys-bar"><div class="sys-bar-fill" style="width:26%;background:var(--primary);"></div></div>
+          <div class="sys-item"><div class="sys-name">📡 WiFi Signal</div><div class="sys-value" id="wifi">-42 dBm (Strong)</div></div>
+          <div class="sys-bar"><div class="sys-bar-fill" style="width:85%;background:var(--accent);"></div></div>
+          <div class="sys-item"><div class="sys-name">🔋 Power Supply</div><div class="sys-value" id="power">12.4V / 5.0A</div></div>
+          <div class="sys-bar"><div class="sys-bar-fill" style="width:78%;background:var(--accent);"></div></div>
+          <div class="sys-item"><div class="sys-name">🌡️ Ambient Temp</div><div class="sys-value" id="ambient">28.4 °C</div></div>
+          <div class="sys-item"><div class="sys-name">💧 Electrolyte Level</div><div class="sys-value" id="electrolyte">87%</div></div>
+          <div class="sys-bar"><div class="sys-bar-fill" style="width:87%;background:var(--warning);"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Session Summary</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--surface-2);">
+            <span style="font-size:0.8rem;color:var(--text-secondary);">Run Duration</span>
+            <span style="font-size:0.9rem;font-weight:700;" id="session-duration">00:00:00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--surface-2);">
+            <span style="font-size:0.8rem;color:var(--text-secondary);">Data Points Logged</span>
+            <span style="font-size:0.9rem;font-weight:700;" id="data-points">0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--surface-2);">
+            <span style="font-size:0.8rem;color:var(--text-secondary);">Avg Efficiency</span>
+            <span style="font-size:0.9rem;font-weight:700;color:var(--accent);" id="avg-efficiency">0%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">
+            <span style="font-size:0.8rem;color:var(--text-secondary);">Anomalies Detected</span>
+            <span style="font-size:0.9rem;font-weight:700;color:var(--danger);" id="anomaly-count">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Electrode Health</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:0.8rem;">Anode (Pt-coated Ti)</span>
+              <span style="font-size:0.8rem;font-weight:600;color:var(--accent);">94%</span>
+            </div>
+            <div class="sys-bar"><div class="sys-bar-fill" style="width:94%;background:var(--accent);"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:0.8rem;">Cathode (Ni mesh)</span>
+              <span style="font-size:0.8rem;font-weight:600;color:var(--warning);">78%</span>
+            </div>
+            <div class="sys-bar"><div class="sys-bar-fill" style="width:78%;background:var(--warning);"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span style="font-size:0.8rem;">Membrane (Nafion)</span>
+              <span style="font-size:0.8rem;font-weight:600;color:var(--accent);">91%</span>
+            </div>
+            <div class="sys-bar"><div class="sys-bar-fill" style="width:91%;background:var(--accent);"></div></div>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--surface-2);font-size:0.7rem;color:var(--text-dim);">
+          Cathode degradation detected. Recommend inspection after 50 more runs.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+const State = {
+  isRunning: false, runStartTime: null, runId: null,
+  dataPoints: [], maxPoints: 60, alerts: [], alertIdCounter: 0,
+  runHistory: [
+    { id: 'RUN-2026-001', timestamp: '2026-07-10 09:15:00', duration: '2h 14m', avgV: 12.4, avgA: 4.2, maxT: 68.2, h2: 892, efficiency: 74.3, status: 'completed' },
+    { id: 'RUN-2026-002', timestamp: '2026-07-11 10:30:00', duration: '1h 45m', avgV: 12.1, avgA: 4.5, maxT: 71.5, h2: 756, efficiency: 63.0, status: 'completed' },
+    { id: 'RUN-2026-003', timestamp: '2026-07-12 14:00:00', duration: '3h 02m', avgV: 12.6, avgA: 4.8, maxT: 65.8, h2: 1154, efficiency: 96.2, status: 'completed' },
+    { id: 'RUN-2026-004', timestamp: '2026-07-13 08:45:00', duration: '1h 20m', avgV: 11.8, avgA: 3.9, maxT: 74.2, h2: 512, efficiency: 42.7, status: 'failed' },
+  ],
+  cumulativeH2: 0, anomalyCount: 0, dataPointCount: 0,
+  timerInterval: null, dataInterval: null, efficiencyTarget: 1200,
+  mqtt: {
+    connected: true, uptime: 14 * 3600 + 32 * 60 + 18, totalMessages: 842391,
+    messagesPerSec: 12.4, pingMs: 24, reconnectCount: 0,
+    topics: [
+      { name: 'urjawave/chamber/voltage', rate: 4.2 },
+      { name: 'urjawave/chamber/current', rate: 4.2 },
+      { name: 'urjawave/chamber/temp', rate: 2.1 },
+      { name: 'urjawave/chamber/flow', rate: 1.0 },
+    ],
+    throughputHistory: Array(60).fill(0).map(() => 8 + Math.random() * 8),
+  },
+  ml: {
+    components: [
+      { id: 'anode', name: 'Anode (Pt-Ti)', score: 94, rul: 340, risk: 'low', trend: [94,93,93,92,92,91,91,90,90,89,89,88,88,87,87] },
+      { id: 'cathode', name: 'Cathode (Ni mesh)', score: 78, rul: 120, risk: 'medium', trend: [95,94,92,90,88,86,84,82,80,79,78,77,76,75,74] },
+      { id: 'membrane', name: 'Membrane (Nafion)', score: 91, rul: 280, risk: 'low', trend: [96,95,95,94,94,93,93,92,92,91,91,90,90,89,89] },
+      { id: 'cooling', name: 'Cooling Loop', score: 72, rul: 95, risk: 'medium', trend: [90,88,86,84,82,80,78,76,74,73,72,71,70,69,68] },
+      { id: 'psu', name: 'Power Supply', score: 88, rul: 210, risk: 'low', trend: [94,93,92,91,90,89,89,88,88,87,87,86,86,85,85] },
+    ],
+    lastTrained: '2026-07-12', f1Score: 0.94,
+  }
+};
+
+const KPIs = [
+  { id: 'voltage', label: 'Voltage', unit: 'V', min: 10, max: 14, normal: 12.4, color: '#06b6d4', decimals: 1 },
+  { id: 'current', label: 'Current', unit: 'A', min: 3, max: 6, normal: 4.5, color: '#f59e0b', decimals: 1 },
+  { id: 'temperature', label: 'Temperature', unit: '°C', min: 55, max: 85, normal: 68, color: '#ef4444', decimals: 1, warn: 75, danger: 80 },
+  { id: 'gas-flow', label: 'Gas Flow Rate', unit: 'L/hr', min: 800, max: 1300, normal: 1050, color: '#10b981', decimals: 0 },
+  { id: 'cumulative', label: 'Cumulative H₂', unit: 'L', min: 0, max: 5000, normal: 0, color: '#8b5cf6', decimals: 1 },
+  { id: 'efficiency', label: 'Efficiency', unit: '%', min: 0, max: 100, normal: 0, color: '#10b981', decimals: 1 },
+];
+
+function init() {
+  renderKPIs(); renderRunHistory(); renderAlerts(); renderMainChart(); renderEffChart(); renderMLComponents(); renderMQTTThroughput();
+  for (let i = 0; i < 30; i++) addDataPoint(false);
+  updateKPIs(); updateCharts();
+  setInterval(simulateMQTT, 1000);
+  setInterval(simulateML, 5000);
+}
+
+function simulateMQTT() {
+  const m = State.mqtt; m.uptime++;
+  if (Math.random() < 0.003) {
+    m.connected = false; m.reconnectCount++;
+    updateMQTTUI();
+    addAlert('warning', 'MQTT Disconnect', `Broker connection lost. Auto-reconnect attempt #${m.reconnectCount}...`, 'network');
+    setTimeout(() => { m.connected = true; m.pingMs = 20 + Math.floor(Math.random() * 30); updateMQTTUI(); addAlert('info', 'MQTT Reconnected', `Broker reconnected. Latency: ${m.pingMs}ms`, 'network'); }, 2000);
+    return;
+  }
+  m.messagesPerSec = 10 + Math.random() * 6;
+  m.totalMessages += Math.floor(m.messagesPerSec);
+  m.pingMs = Math.max(12, m.pingMs + (Math.random() - 0.5) * 4);
+  m.topics[0].rate = 3.8 + Math.random() * 1.2;
+  m.topics[1].rate = 3.8 + Math.random() * 1.2;
+  m.topics[2].rate = 1.8 + Math.random() * 0.8;
+  m.topics[3].rate = 0.8 + Math.random() * 0.5;
+  m.throughputHistory.shift();
+  m.throughputHistory.push(m.messagesPerSec);
+  updateMQTTUI();
+}
+
+function updateMQTTUI() {
+  const m = State.mqtt;
+  const dot = document.getElementById('mqtt-dot');
+  const text = document.getElementById('mqtt-text');
+  const badge = document.getElementById('mqtt-badge');
+  if (m.connected) {
+    dot.className = 'status-dot live'; text.textContent = 'MQTT Connected';
+    badge.textContent = '● CONNECTED'; badge.className = 'card-badge badge-live';
+  } else {
+    dot.className = 'status-dot danger blink'; text.textContent = 'MQTT Reconnecting...';
+    badge.textContent = '● DISCONNECTED'; badge.className = 'card-badge badge-danger';
+  }
+  const uptimeH = Math.floor(m.uptime / 3600);
+  const uptimeM = Math.floor((m.uptime % 3600) / 60);
+  const uptimeS = m.uptime % 60;
+  document.getElementById('mqtt-uptime').textContent = `${uptimeH}h ${uptimeM}m ${uptimeS}s`;
+  document.getElementById('mqtt-ping').textContent = `${Math.round(m.pingMs)}ms`;
+  document.getElementById('mqtt-rate').textContent = m.messagesPerSec.toFixed(1);
+  document.getElementById('mqtt-total').textContent = m.totalMessages.toLocaleString();
+  const topicsEl = document.getElementById('mqtt-topics');
+  if (topicsEl) topicsEl.innerHTML = m.topics.map(t => `<div class="mqtt-topic"><span class="mqtt-topic-name">${t.name}</span><span class="mqtt-topic-rate">${t.rate.toFixed(1)}/s</span></div>`).join('');
+  renderMQTTThroughput();
+}
+
+function renderMQTTThroughput() {
+  const el = document.getElementById('mqtt-throughput');
+  if (!el) return;
+  const max = Math.max(...State.mqtt.throughputHistory, 1);
+  el.innerHTML = State.mqtt.throughputHistory.map((v, i) => {
+    const h = (v / max * 100);
+    return `<div class="mqtt-tick ${i > 50 ? 'recent' : 'active'}" style="height:${Math.max(4, h)}%;"></div>`;
+  }).join('');
+}
+
+function simulateML() {
+  if (!State.isRunning) return;
+  State.ml.components.forEach(c => {
+    const degradation = Math.random() * 0.3;
+    c.score = Math.max(0, c.score - degradation);
+    c.trend.shift(); c.trend.push(c.score);
+    if (c.score > 90) { c.rul = Math.max(50, c.rul - 2); c.risk = 'low'; }
+    else if (c.score > 75) { c.rul = Math.max(30, c.rul - 5); c.risk = 'medium'; }
+    else if (c.score > 50) { c.rul = Math.max(10, c.rul - 8); c.risk = 'high'; }
+    else { c.rul = Math.max(0, c.rul - 12); c.risk = 'critical'; }
+    if (c.score < 50 && c.risk === 'high') addAlert('critical', `${c.name} Critical`, `Health score dropped to ${c.score.toFixed(0)}%. RUL: ${c.rul} runs. Immediate inspection required.`, 'predictive');
+    else if (c.score < 75 && c.risk === 'medium' && Math.random() < 0.3) addAlert('warning', `${c.name} Degrading`, `Health score: ${c.score.toFixed(0)}%. Schedule maintenance within ${c.rul} runs.`, 'predictive');
+  });
+  renderMLComponents();
+}
+
+function renderMLComponents() {
+  const el = document.getElementById('ml-components');
+  if (!el) return;
+  el.innerHTML = State.ml.components.map(c => {
+    const scoreClass = c.score >= 90 ? 'ml-score-good' : c.score >= 70 ? 'ml-score-warn' : 'ml-score-danger';
+    const riskClass = c.risk === 'low' ? 'ml-risk-low' : c.risk === 'medium' ? 'ml-risk-med' : 'ml-risk-high';
+    const riskLabel = c.risk === 'low' ? 'LOW RISK' : c.risk === 'medium' ? 'MEDIUM RISK' : 'HIGH RISK';
+    const action = c.score >= 90 ? 'No action needed.' : c.score >= 75 ? `Inspect in ${c.rul} runs.` : c.score >= 50 ? `Schedule replacement in ${c.rul} runs.` : 'CRITICAL: Replace immediately.';
+    return `<div class="ml-component"><div class="ml-component-header"><span class="ml-component-name">${c.name}</span><span class="ml-component-score ${scoreClass}">${c.score.toFixed(0)}%</span></div><div class="ml-rul">RUL: <span class="ml-rul-value">${c.rul} runs</span> remaining</div><div class="ml-degradation-chart">${c.trend.map((v, i) => { const h = Math.max(3, v / 100 * 20); const color = v >= 90 ? 'var(--accent)' : v >= 70 ? 'var(--warning)' : 'var(--danger)'; return `<div class="ml-deg-bar" style="height:${h}px;background:${color};opacity:${0.4 + (i/c.trend.length)*0.6};"></div>`; }).join('')}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;"><span class="ml-risk ${riskClass}">${riskLabel}</span><span class="ml-action">${action}</span></div></div>`;
+  }).join('');
+  const mlDot = document.getElementById('ml-dot');
+  const mlText = document.getElementById('ml-text');
+  const mlBadge = document.getElementById('ml-badge');
+  const anyCritical = State.ml.components.some(c => c.score < 50);
+  const anyWarn = State.ml.components.some(c => c.score < 75);
+  if (anyCritical) { mlDot.className = 'status-dot danger'; mlText.textContent = 'ML Alert'; mlBadge.textContent = '● CRITICAL'; mlBadge.className = 'card-badge badge-danger'; }
+  else if (anyWarn) { mlDot.className = 'status-dot warn'; mlText.textContent = 'ML Warning'; mlBadge.textContent = '● WARNING'; mlBadge.className = 'card-badge badge-warn'; }
+  else { mlDot.className = 'status-dot live'; mlText.textContent = 'ML Active'; mlBadge.textContent = '● INFERENCE'; mlBadge.className = 'card-badge badge-info'; }
+}
+
+function renderKPIs() {
+  const grid = document.getElementById('kpi-grid');
+  grid.innerHTML = KPIs.map(kpi => `<div class="card kpi-card" id="kpi-${kpi.id}"><div class="kpi-label">${kpi.label}</div><div><span class="kpi-value" id="val-${kpi.id}" style="color:${kpi.color};">--</span><span class="kpi-unit">${kpi.unit}</span></div><div class="kpi-trend" id="trend-${kpi.id}"><span>─</span> <span>Stable</span></div><div class="kpi-mini-chart" id="chart-${kpi.id}"></div></div>`).join('');
+}
+
+function updateKPIs() {
+  if (State.dataPoints.length === 0) return;
+  const latest = State.dataPoints[State.dataPoints.length - 1];
+  const prev = State.dataPoints.length > 1 ? State.dataPoints[State.dataPoints.length - 2] : latest;
+  updateKPI('voltage', latest.voltage, prev.voltage, 0.3);
+  updateKPI('current', latest.current, prev.current, 0.2);
+  updateKPI('temperature', latest.temperature, prev.temperature, 1.0);
+  updateKPI('gas-flow', latest.gasFlow, prev.gasFlow, 20);
+  updateKPI('cumulative', State.cumulativeH2, State.cumulativeH2 - latest.gasFlow * 0.0167, 5);
+  const eff = (latest.gasFlow / State.efficiencyTarget * 100);
+  updateKPI('efficiency', eff, prev.gasFlow / State.efficiencyTarget * 100, 2);
+  document.getElementById('eff-current').textContent = Math.round(latest.gasFlow);
+  document.getElementById('eff-percent').textContent = eff.toFixed(1) + '%';
+  document.getElementById('eff-cumulative').textContent = State.cumulativeH2.toFixed(1);
+  document.getElementById('data-points').textContent = State.dataPointCount;
+  const effEl = document.getElementById('eff-percent');
+  if (eff >= 90) effEl.style.color = 'var(--accent)';
+  else if (eff >= 70) effEl.style.color = 'var(--primary)';
+  else effEl.style.color = 'var(--warning)';
+}
+
+function updateKPI(id, val, prev, threshold) {
+  const el = document.getElementById(`val-${id}`);
+  const trendEl = document.getElementById(`trend-${id}`);
+  const card = document.getElementById(`kpi-${id}`);
+  const chartEl = document.getElementById(`chart-${id}`);
+  if (!el) return;
+  el.textContent = val.toFixed(KPIs.find(k => k.id === id).decimals);
+  const diff = val - prev;
+  const kpiDef = KPIs.find(k => k.id === id);
+  if (Math.abs(diff) < threshold) { trendEl.innerHTML = '<span>─</span> <span>Stable</span>'; trendEl.className = 'kpi-trend'; }
+  else if (diff > 0) { trendEl.innerHTML = '<span>▲</span> <span>+' + diff.toFixed(1) + '</span>'; trendEl.className = 'kpi-trend trend-up'; }
+  else { trendEl.innerHTML = '<span>▼</span> <span>' + diff.toFixed(1) + '</span>'; trendEl.className = 'kpi-trend trend-down'; }
+  if (id === 'temperature') { card.classList.remove('alert', 'warn'); if (val >= kpiDef.danger) card.classList.add('alert'); else if (val >= kpiDef.warn) card.classList.add('warn'); }
+  if (chartEl) {
+    const recent = State.dataPoints.slice(-15).map(d => d[id === 'gas-flow' ? 'gasFlow' : id === 'cumulative' ? 'cumulative' : id === 'efficiency' ? 'gasFlow' : id]);
+    const max = Math.max(...recent, 1); const min = Math.min(...recent); const range = max - min || 1;
+    chartEl.innerHTML = recent.map((v, i) => { const h = ((v - min) / range * 100); const isAlert = id === 'temperature' && v >= (kpiDef.warn || 999); return `<div class="kpi-mini-bar ${isAlert ? 'alert' : (i === recent.length - 1 ? 'active' : '')}" style="height:${Math.max(10, h)}%;"></div>`; }).join('');
+  }
+}
+
+function generateDataPoint() {
+  const last = State.dataPoints.length > 0 ? State.dataPoints[State.dataPoints.length - 1] : null;
+  let voltage = last ? last.voltage + (Math.random() - 0.5) * 0.4 : 12.4;
+  voltage = Math.max(10, Math.min(14, voltage));
+  let current = last ? last.current + (Math.random() - 0.5) * 0.3 : 4.5;
+  current = Math.max(3, Math.min(6, current));
+  let temperature = last ? last.temperature + (Math.random() - 0.5) * 1.5 : 68;
+  temperature = Math.max(55, Math.min(85, temperature));
+  if (Math.random() < 0.03) { temperature += Math.random() * 8; addAlert('warning', 'Temperature Spike', `Chamber temp rose to ${temperature.toFixed(1)}°C. Check cooling loop.`, 'thermal'); }
+  if (Math.random() < 0.02) { voltage -= Math.random() * 2; addAlert('critical', 'Voltage Drop', `Supply voltage dropped to ${voltage.toFixed(1)}V. Check power supply stability.`, 'electrical'); }
+  let gasFlow = (voltage * current * 18) + (Math.random() - 0.5) * 40;
+  gasFlow = Math.max(800, Math.min(1300, gasFlow));
+  State.cumulativeH2 += gasFlow * 0.0167;
+  State.dataPointCount++;
+  return { time: new Date(), voltage, current, temperature, gasFlow, cumulative: State.cumulativeH2 };
+}
+
+function addDataPoint(shouldAlert = true) {
+  const point = generateDataPoint();
+  State.dataPoints.push(point);
+  if (State.dataPoints.length > State.maxPoints) State.dataPoints.shift();
+  if (shouldAlert) { updateKPIs(); updateCharts(); }
+}
+
+function renderMainChart() {
+  const w = 800, h = 220; const padding = { top: 20, right: 40, bottom: 30, left: 50 };
+  const grid = document.getElementById('main-grid');
+  let gridHTML = '';
+  for (let i = 0; i <= 5; i++) { const y = padding.top + (h - padding.top - padding.bottom) * i / 5; gridHTML += `<line class="chart-grid-line" x1="${padding.left}" y1="${y}" x2="${w - padding.right}" y2="${y}" />`; }
+  grid.innerHTML = gridHTML;
+}
+
+function updateCharts() {
+  if (State.dataPoints.length < 2) return;
+  const w = 800, h = 220; const padding = { top: 20, right: 40, bottom: 30, left: 50 };
+  const chartW = w - padding.left - padding.right; const chartH = h - padding.top - padding.bottom;
+  const points = State.dataPoints; const n = points.length;
+  const maxV = 15, minV = 9, maxC = 7, minC = 2, maxT = 90, minT = 50;
+  const x = (i) => padding.left + (i / (n - 1)) * chartW;
+  const yV = (v) => padding.top + chartH - ((v - minV) / (maxV - minV)) * chartH;
+  const yC = (c) => padding.top + chartH - ((c - minC) / (maxC - minC)) * chartH;
+  const yT = (t) => padding.top + chartH - ((t - minT) / (maxT - minT)) * chartH;
+  const voltPath = points.map((p, i) => `${i===0?'M':'L'} ${x(i)} ${yV(p.voltage)}`).join(' ');
+  document.getElementById('volt-line').setAttribute('d', voltPath);
+  document.getElementById('volt-area').setAttribute('d', `${voltPath} L ${x(n-1)} ${padding.top + chartH} L ${x(0)} ${padding.top + chartH} Z`);
+  const currPath = points.map((p, i) => `${i===0?'M':'L'} ${x(i)} ${yC(p.current)}`).join(' ');
+  document.getElementById('curr-line').setAttribute('d', currPath);
+  document.getElementById('curr-area').setAttribute('d', `${currPath} L ${x(n-1)} ${padding.top + chartH} L ${x(0)} ${padding.top + chartH} Z`);
+  const tempPath = points.map((p, i) => `${i===0?'M':'L'} ${x(i)} ${yT(p.temperature)}`).join(' ');
+  document.getElementById('temp-line').setAttribute('d', tempPath);
+  const pointsG = document.getElementById('main-points');
+  let pointsHTML = '';
+  for (let i = Math.max(0, n - 8); i < n; i++) pointsHTML += `<circle class="chart-point" cx="${x(i)}" cy="${yV(points[i].voltage)}" fill="#06b6d4" onmouseenter="showTooltip(event, 'Voltage: ${points[i].voltage.toFixed(1)}V')" onmouseleave="hideTooltip()" />`;
+  pointsG.innerHTML = pointsHTML;
+  updateEffChart();
+}
+
+function renderEffChart() {
+  const w = 400, h = 180; const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+  const grid = document.getElementById('eff-grid');
+  let gridHTML = '';
+  for (let i = 0; i <= 4; i++) { const y = padding.top + (h - padding.top - padding.bottom) * i / 4; gridHTML += `<line class="chart-grid-line" x1="${padding.left}" y1="${y}" x2="${w - padding.right}" y2="${y}" />`; }
+  grid.innerHTML = gridHTML;
+  const targetY = padding.top + (h - padding.top - padding.bottom) * 0.2;
+  document.getElementById('target-line').setAttribute('x1', padding.left);
+  document.getElementById('target-line').setAttribute('y1', targetY);
+  document.getElementById('target-line').setAttribute('x2', w - padding.right);
+  document.getElementById('target-line').setAttribute('y2', targetY);
+  document.getElementById('target-label').setAttribute('x', w - padding.right);
+  document.getElementById('target-label').setAttribute('y', targetY - 6);
+}
+
+function updateEffChart() {
+  if (State.dataPoints.length < 2) return;
+  const w = 400, h = 180; const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+  const chartW = w - padding.left - padding.right; const chartH = h - padding.top - padding.bottom;
+  const points = State.dataPoints; const n = points.length; const maxEff = 1500;
+  const x = (i) => padding.left + (i / (n - 1)) * chartW;
+  const y = (flow) => padding.top + chartH - (flow / maxEff) * chartH;
+  const effPath = points.map((p, i) => `${i===0?'M':'L'} ${x(i)} ${y(p.gasFlow)}`).join(' ');
+  document.getElementById('eff-line').setAttribute('d', effPath);
+  document.getElementById('eff-area').setAttribute('d', `${effPath} L ${x(n-1)} ${padding.top + chartH} L ${x(0)} ${padding.top + chartH} Z`);
+}
+
+function showTooltip(e, text) { const tt = document.getElementById('main-tooltip'); tt.textContent = text; tt.style.left = e.pageX + 10 + 'px'; tt.style.top = e.pageY - 30 + 'px'; tt.style.opacity = 1; }
+function hideTooltip() { document.getElementById('main-tooltip').style.opacity = 0; }
+
+function addAlert(severity, title, desc, category) {
+  State.alertIdCounter++;
+  const alert = { id: State.alertIdCounter, severity, title, desc, time: new Date().toLocaleTimeString(), category };
+  State.alerts.unshift(alert);
+  if (State.alerts.length > 20) State.alerts.pop();
+  if (severity === 'critical' || severity === 'warning') { State.anomalyCount++; document.getElementById('anomaly-count').textContent = State.anomalyCount; }
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const panel = document.getElementById('alerts-panel');
+  const count = State.alerts.filter(a => a.severity !== 'info').length;
+  document.getElementById('alert-count').textContent = count + ' Active';
+  if (State.alerts.length === 0) { panel.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-dim);font-size:0.8rem;">No alerts. System nominal.</div>'; return; }
+  panel.innerHTML = State.alerts.slice(0, 8).map(a => `<div class="alert-item ${a.severity}"><div class="alert-icon ${a.severity}">${a.severity==='critical'?'⚠':a.severity==='warning'?'▲':'ℹ'}</div><div class="alert-content"><div class="alert-title">${a.title}</div><div class="alert-desc">${a.desc}</div><div class="alert-time">${a.time} • ${a.category}</div></div><div class="alert-dismiss" onclick="dismissAlert(${a.id})">✕</div></div>`).join('');
+}
+
+function dismissAlert(id) { State.alerts = State.alerts.filter(a => a.id !== id); renderAlerts(); }
+
+function renderRunHistory() {
+  const tbody = document.getElementById('run-tbody');
+  tbody.innerHTML = State.runHistory.map(run => `<tr><td style="font-weight:600;color:var(--primary);font-size:0.75rem;">${run.id}</td><td>${run.timestamp}</td><td>${run.duration}</td><td>${run.avgV.toFixed(1)}V</td><td>${run.avgA.toFixed(1)}A</td><td>${run.maxT.toFixed(1)}°C</td><td style="font-weight:600;">${run.h2} L</td><td style="color:${run.efficiency>=90?'var(--accent)':run.efficiency>=70?'var(--primary)':'var(--warning)'};font-weight:600;">${run.efficiency.toFixed(1)}%</td><td><span class="run-status ${run.status}">${run.status==='completed'?'✓ Completed':run.status==='running'?'● Running':'✕ Failed'}</span></td></tr>`).join('');
+}
+
+function filterRuns(type) {
+  const tbody = document.getElementById('run-tbody');
+  const filtered = type === 'all' ? State.runHistory : State.runHistory.filter(r => r.status === type);
+  tbody.innerHTML = filtered.map(run => `<tr><td style="font-weight:600;color:var(--primary);font-size:0.75rem;">${run.id}</td><td>${run.timestamp}</td><td>${run.duration}</td><td>${run.avgV.toFixed(1)}V</td><td>${run.avgA.toFixed(1)}A</td><td>${run.maxT.toFixed(1)}°C</td><td style="font-weight:600;">${run.h2} L</td><td style="color:${run.efficiency>=90?'var(--accent)':run.efficiency>=70?'var(--primary)':'var(--warning)'};font-weight:600;">${run.efficiency.toFixed(1)}%</td><td><span class="run-status ${run.status}">${run.status==='completed'?'✓ Completed':run.status==='running'?'● Running':'✕ Failed'}</span></td></tr>`).join('');
+}
+
+function toggleRun() {
+  const btn = document.getElementById('run-btn');
+  if (!State.isRunning) {
+    State.isRunning = true; State.runStartTime = Date.now();
+    State.runId = 'RUN-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(State.runHistory.length + 1).padStart(3,'0');
+    State.cumulativeH2 = 0; State.dataPointCount = 0; State.anomalyCount = 0; State.dataPoints = [];
+    btn.textContent = '⏹ Stop Run'; btn.className = 'btn btn-danger btn-sm';
+    addAlert('info', 'Run Started', `Test run ${State.runId} initiated. All sensors active.`, 'system');
+    State.timerInterval = setInterval(() => {
+      const elapsed = Date.now() - State.runStartTime;
+      const hrs = Math.floor(elapsed / 3600000).toString().padStart(2,'0');
+      const mins = Math.floor((elapsed % 3600000) / 60000).toString().padStart(2,'0');
+      const secs = Math.floor((elapsed % 60000) / 1000).toString().padStart(2,'0');
+      document.getElementById('session-duration').textContent = `${hrs}:${mins}:${secs}`;
+    }, 1000);
+    State.dataInterval = setInterval(() => { addDataPoint(true); }, 2000);
+  } else {
+    State.isRunning = false; clearInterval(State.timerInterval); clearInterval(State.dataInterval);
+    btn.textContent = '▶ Start Run'; btn.className = 'btn btn-success btn-sm';
+    const duration = document.getElementById('session-duration').textContent;
+    const avgV = State.dataPoints.reduce((a,b) => a+b.voltage,0) / State.dataPoints.length;
+    const avgA = State.dataPoints.reduce((a,b) => a+b.current,0) / State.dataPoints.length;
+    const maxT = Math.max(...State.dataPoints.map(d => d.temperature));
+    const eff = (State.cumulativeH2 / (State.dataPoints.length * 0.0333) / State.efficiencyTarget * 100);
+    const newRun = { id: State.runId, timestamp: new Date().toISOString().slice(0,19).replace('T',' '), duration: duration, avgV: avgV, avgA: avgA, maxT: maxT, h2: Math.round(State.cumulativeH2), efficiency: Math.min(100, eff), status: maxT > 80 ? 'failed' : 'completed' };
+    State.runHistory.unshift(newRun); renderRunHistory();
+    addAlert('info', 'Run Completed', `Run ${State.runId} finished. ${Math.round(State.cumulativeH2)}L H₂ produced. Efficiency: ${eff.toFixed(1)}%`, 'system');
+    document.getElementById('session-duration').textContent = '00:00:00';
+  }
+}
+
+function exportData() {
+  const csv = 'timestamp,voltage,current,temperature,gas_flow,cumulative_h2\n' + State.dataPoints.map(p => `${p.time.toISOString()},${p.voltage.toFixed(2)},${p.current.toFixed(2)},${p.temperature.toFixed(2)},${p.gasFlow.toFixed(2)},${p.cumulative.toFixed(2)}`).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `urjawave_run_${State.runId || 'export'}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  addAlert('info', 'Data Exported', 'CSV file downloaded with full sensor telemetry.', 'system');
+}
+
+init();
+setTimeout(() => addAlert('warning', 'Electrode Degradation', 'Cathode efficiency dropped 6% over last 50 runs. Schedule inspection.', 'maintenance'), 1000);
+setTimeout(() => addAlert('info', 'Simulation Validated', 'Chamber geometry field distribution matches theoretical model within ±2.3%.', 'simulation'), 2000);
+</script>
+</body>
+</html>
