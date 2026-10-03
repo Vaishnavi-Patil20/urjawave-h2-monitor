@@ -1,4 +1,4 @@
-# UrjaWave H₂ Monitor — Professional v2
+# UrjaWave H₂ Monitor 
 
 **Industrial Hydrogen Generation Monitoring & Safety Platform**
 
